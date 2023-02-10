@@ -1,0 +1,40 @@
+version: 0.1
+env:
+    secrets-manager:
+      TOKEN: firstSecret-2:tokenForSonar
+      SYNKTOKEN: snytoken:SYNKKEY
+phases:
+  build:
+    commands:
+      - mvn verify sonar:sonar -Dsonar.projectKey=javaprojectaws78 -Dsonar.organization=javaprojectaws78 -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=$TOKEN  
+      - sleep 5
+      - |- 
+        quality_status=$(curl -s -u $TOKEN: https://sonarcloud.io/api/qualitygates/project_status?projectKey=javaprojectaws78 | jq -r '.projectStatus.status')
+        echo "SonarCloud analysistatus is $quality_status"; 
+        if [ $quality_status = "ERROR" ] ; then exit 1;fi
+        
+#Software Composition Analysis Scan (SCA scan) using Snyk
+
+      - |-
+          apt-get update
+          apt-get -y install maven 
+          SNYK_TOKEN=$SYNKKEY
+          export SNYK_TOKEN
+          mvn snyk:test -fn 
+#Dynamic Application Security Scan (DAST scan) using OWASP ZAP
+
+      - |-
+        apt-get update
+        apt-get -y install wget
+        apt-get -y install default-jdk
+        wget https://github.com/zaproxy/zaproxy/releases/download/v2.11.1/ZAP_2.11.1_Linux.tar.gz
+        mkdir zap
+        tar -xvf ZAP_2.11.1_Linux.tar.gz
+        cd ZAP_2.11.1
+        ./zap.sh -cmd -quickurl https://www.example.com -quickprogress -quickout ../zap_report.html 
+        
+#Storing DAST Reports in S3 bucket
+
+artifacts:
+  files:
+    - zap_report.html
